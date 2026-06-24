@@ -5,19 +5,27 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 
+	"github.com/99designs/gqlgen/graphql/handler"
+	"github.com/99designs/gqlgen/graphql/handler/extension"
+	"github.com/99designs/gqlgen/graphql/handler/lru"
+	"github.com/99designs/gqlgen/graphql/handler/transport"
+	"github.com/99designs/gqlgen/graphql/playground"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/mysql"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/thiagomaganha/go-clean-architecture/configs"
 	"github.com/thiagomaganha/go-clean-architecture/internal/infra/database"
-	grpchandler "github.com/thiagomaganha/go-clean-architecture/internal/infra/grpc/handler"
+	gql "github.com/thiagomaganha/go-clean-architecture/internal/infra/graphql"
+	grpchandler "github.com/thiagomaganha/go-clean-architecture/internal/infra/grpc"
 	"github.com/thiagomaganha/go-clean-architecture/internal/infra/grpc/pb"
 	"github.com/thiagomaganha/go-clean-architecture/internal/infra/web"
 	"github.com/thiagomaganha/go-clean-architecture/internal/infra/web/webserver"
 	"github.com/thiagomaganha/go-clean-architecture/internal/usecase"
 	embeddedSQL "github.com/thiagomaganha/go-clean-architecture/sql"
+	"github.com/vektah/gqlparser/v2/ast"
 	"google.golang.org/grpc"
 )
 
@@ -55,6 +63,28 @@ func main() {
 		fmt.Println("Starting gRPC server on port", configs.GRPCServerPort)
 		if err := grpcServer.Serve(lis); err != nil {
 			log.Fatalf("failed to serve gRPC: %v", err)
+		}
+	}()
+
+	// GraphQL server
+	go func() {
+		resolver := &gql.Resolver{
+			CreateOrderUseCase: createOrderUseCase,
+			ListOrdersUseCase:  listOrdersUseCase,
+		}
+		gqlSrv := handler.New(gql.NewExecutableSchema(gql.Config{Resolvers: resolver}))
+		gqlSrv.AddTransport(transport.Options{})
+		gqlSrv.AddTransport(transport.GET{})
+		gqlSrv.AddTransport(transport.POST{})
+		gqlSrv.SetQueryCache(lru.New[*ast.QueryDocument](1000))
+		gqlSrv.Use(extension.Introspection{})
+
+		http.Handle("/", playground.Handler("GraphQL playground", "/query"))
+		http.Handle("/query", gqlSrv)
+
+		fmt.Println("Starting GraphQL server on port", configs.GraphQLServerPort)
+		if err := http.ListenAndServe(configs.GraphQLServerPort, nil); err != nil {
+			log.Fatalf("failed to serve GraphQL: %v", err)
 		}
 	}()
 

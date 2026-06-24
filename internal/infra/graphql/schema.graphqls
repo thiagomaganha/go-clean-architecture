@@ -1,0 +1,23 @@
+type Order {
+    id:         String!
+    number:     String!
+    price:      Float!
+    tax:        Float!
+    finalPrice: Float!
+}
+
+type OrderList {
+    orders: [Order!]!
+    total:  Int!
+    page:   Int!
+    limit:  Int!
+}
+
+type Query {
+    listOrders(page: Int, limit: Int, query: String): OrderList!
+}
+
+type Mutation {
+    createOrder(id: String!, number: String!, price: Float!, tax: Float!): Order!
+}
+
