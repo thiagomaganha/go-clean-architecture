@@ -1,12 +1,15 @@
-FROM golang:1.24-alpine AS builder
+FROM docker.io/library/golang:1.25-alpine AS builder
 
 WORKDIR /app
 
+COPY go.mod go.sum ./
+RUN go mod download
+
 COPY . .
 
-RUN go build -mod=vendor -o ordersystem cmd/ordersystem/main.go
+RUN go build -o ordersystem cmd/ordersystem/main.go
 
-FROM alpine:latest
+FROM docker.io/library/alpine:latest
 
 WORKDIR /app
 

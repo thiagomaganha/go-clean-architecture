@@ -44,10 +44,16 @@ sql/migrations/               # Migrations gerenciadas pelo golang-migrate (embe
 
 ## Executando a aplicação
 
-### Com Docker Compose (recomendado)
+### Com Docker
 
 ```bash
 docker compose -f docker_compose.yml up --build
+```
+
+### Com Podman
+
+```bash
+podman-compose -f podman_compose.yml up -d
 ```
 
 ### Localmente
