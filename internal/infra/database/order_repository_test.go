@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"github.com/thiagomaganha/go-clean-architecture/internal/entity"
-	"github.com/thiagomaganha/go-clean-architecture/internal/usecase"
 	_ "modernc.org/sqlite"
 )
 
@@ -34,19 +33,17 @@ func TestOrderRepositorySuite(t *testing.T) {
 func (suite *OrderRepositorySuite) TestList() {
 	ctx := context.Background()
 	repo := NewOrderRepository(suite.Db)
-	input := usecase.ListOrdersInput{Query: "%", Page: 1, Limit: 10}
-	output, err := repo.List(ctx, input)
+	output, total, err := repo.List(ctx, 1, 10, "%")
 	suite.NoError(err)
-	suite.Equal(0, len(output.Orders))
-	suite.Equal(0, output.Total)
+	suite.Equal(nil, output)
+	suite.Equal(0, total)
 
-	order := entity.NewOrder("123", "ORD1", 10.0, 2.0)
+	order, err := entity.NewOrder("123", "ORD1", 10.0, 2.0)
 	suite.NoError(err)
 	err = repo.Save(ctx, order)
 	suite.NoError(err)
 
-	output, err = repo.List(ctx, input)
+	output, total, err = repo.List(ctx, 1, 10, "%")
 	suite.NoError(err)
-	suite.Equal(1, len(output.Orders))
-	suite.Equal(1, output.Total)
+	suite.Equal(1, total)
 }

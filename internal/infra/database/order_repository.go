@@ -5,7 +5,6 @@ import (
 	"database/sql"
 
 	"github.com/thiagomaganha/go-clean-architecture/internal/entity"
-	"github.com/thiagomaganha/go-clean-architecture/internal/usecase"
 )
 
 type OrderRepository struct {
@@ -25,43 +24,38 @@ func (r *OrderRepository) Save(ctx context.Context, order *entity.Order) error {
 	return err
 }
 
-func (o *OrderRepository) List(ctx context.Context, input usecase.ListOrdersInput) (usecase.ListOrdersOutput, error) {
+func (o *OrderRepository) List(ctx context.Context, page int, limit int, query string) ([]entity.Order, int, error) {
 	var total int
 	if err := o.Db.QueryRowContext(
 		ctx,
 		"SELECT COUNT(*) FROM orders WHERE number LIKE ?",
-		input.Query,
+		query,
 	).Scan(&total); err != nil {
-		return usecase.ListOrdersOutput{}, err
+		return []entity.Order{}, 0, err
 	}
 
 	var orders []entity.Order
-	offset := (input.Page - 1) * input.Limit
+	offset := (page - 1) * limit
 	rows, err := o.Db.QueryContext(
 		ctx,
 		"SELECT id, number, price, tax, final_price FROM orders WHERE number LIKE ? LIMIT ? OFFSET ?",
-		input.Query, input.Limit, offset,
+		query, limit, offset,
 	)
 	if err != nil {
-		return usecase.ListOrdersOutput{}, err
+		return []entity.Order{}, 0, err
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var order entity.Order
 		if err := rows.Scan(&order.ID, &order.Number, &order.Price, &order.Tax, &order.FinalPrice); err != nil {
-			return usecase.ListOrdersOutput{}, err
+			return []entity.Order{}, 0, err
 		}
 		orders = append(orders, order)
 	}
 	if err := rows.Err(); err != nil {
-		return usecase.ListOrdersOutput{}, err
+		return []entity.Order{}, 0, err
 	}
 
-	return usecase.ListOrdersOutput{
-		Orders: orders,
-		Total:  total,
-		Page:   input.Page,
-		Limit:  input.Limit,
-	}, nil
+	return orders, total, nil
 }

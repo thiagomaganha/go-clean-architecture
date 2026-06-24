@@ -4,16 +4,21 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/mysql"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/thiagomaganha/go-clean-architecture/configs"
 	"github.com/thiagomaganha/go-clean-architecture/internal/infra/database"
+	grpchandler "github.com/thiagomaganha/go-clean-architecture/internal/infra/grpc/handler"
+	"github.com/thiagomaganha/go-clean-architecture/internal/infra/grpc/pb"
 	"github.com/thiagomaganha/go-clean-architecture/internal/infra/web"
 	"github.com/thiagomaganha/go-clean-architecture/internal/infra/web/webserver"
 	"github.com/thiagomaganha/go-clean-architecture/internal/usecase"
+	embeddedSQL "github.com/thiagomaganha/go-clean-architecture/sql"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -35,10 +40,30 @@ func main() {
 
 	orderRepository := database.NewOrderRepository(db)
 	listOrdersUseCase := usecase.NewListOrdersUseCase(orderRepository)
+	createOrderUseCase := usecase.NewCreateOrderUseCase(orderRepository)
 
+	// gRPC server
+	grpcServer := grpc.NewServer()
+	orderGrpcHandler := grpchandler.NewOrderGrpcHandler(createOrderUseCase, listOrdersUseCase)
+	pb.RegisterOrderServiceServer(grpcServer, orderGrpcHandler)
+
+	go func() {
+		lis, err := net.Listen("tcp", configs.GRPCServerPort)
+		if err != nil {
+			log.Fatalf("failed to listen on gRPC port: %v", err)
+		}
+		fmt.Println("Starting gRPC server on port", configs.GRPCServerPort)
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatalf("failed to serve gRPC: %v", err)
+		}
+	}()
+
+	// HTTP server
 	webserver := webserver.NewWebServer(configs.WebServerPort)
-	webOrderHandler := web.NewWebOrderHandler(listOrdersUseCase)
-	webserver.AddHandler("/order", webOrderHandler.ListOrders)
+	webOrderHandler := web.NewWebOrderHandler(listOrdersUseCase, createOrderUseCase)
+	webserver.AddHandler("GET", "/order", webOrderHandler.ListOrders)
+	webserver.AddHandler("POST", "/order", webOrderHandler.CreateOrder)
+
 	fmt.Println("Starting web server on port", configs.WebServerPort)
 	webserver.Start()
 }
@@ -49,8 +74,14 @@ func runMigrations(db *sql.DB, dbName string) error {
 		return fmt.Errorf("could not start sql migration driver: %w", err)
 	}
 
-	m, err := migrate.NewWithDatabaseInstance(
-		"file://sql/migrations",
+	src, err := iofs.New(embeddedSQL.Migrations, "migrations")
+	if err != nil {
+		return fmt.Errorf("could not open migrations source: %w", err)
+	}
+
+	m, err := migrate.NewWithInstance(
+		"iofs",
+		src,
 		dbName,
 		driver,
 	)

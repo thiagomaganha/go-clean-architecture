@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package pb;
+
+option go_package = "github.com/thiagomaganha/go-clean-architecture/internal/infra/grpc/pb";
+
+service OrderService {
+    rpc CreateOrder(CreateOrderRequest) returns (CreateOrderResponse);
+    rpc ListOrders(ListOrdersRequest)   returns (ListOrdersResponse);
+}
+
+message CreateOrderRequest {
+    string id     = 1;
+    string number = 2;
+    double price  = 3;
+    double tax    = 4;
+}
+
+message CreateOrderResponse {
+    string id          = 1;
+    string number      = 2;
+    double price       = 3;
+    double tax         = 4;
+    double final_price = 5;
+}
+
+message ListOrdersRequest {
+    int32  page  = 1;
+    int32  limit = 2;
+    string query = 3;
+}
+
+message Order {
+    string id          = 1;
+    string number      = 2;
+    double price       = 3;
+    double tax         = 4;
+    double final_price = 5;
+}
+
+message ListOrdersResponse {
+    repeated Order orders = 1;
+    int32          total  = 2;
+    int32          page   = 3;
+    int32          limit  = 4;
+}

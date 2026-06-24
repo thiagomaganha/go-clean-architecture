@@ -19,20 +19,15 @@ type ListOrdersOutput struct {
 	Limit  int
 }
 
-type OrderRepositoryInterface interface {
-	List(ctx context.Context, input ListOrdersInput) (ListOrdersOutput, error)
-	Save(ctx context.Context, order *entity.Order) error
-}
-
 type ListOrdersUseCaseInterface interface {
 	Execute(ctx context.Context, input ListOrdersInput) (ListOrdersOutput, error)
 }
 
 type ListOrdersUseCase struct {
-	OrderRepository OrderRepositoryInterface
+	OrderRepository entity.OrderRepository
 }
 
-func NewListOrdersUseCase(orderRepository OrderRepositoryInterface) *ListOrdersUseCase {
+func NewListOrdersUseCase(orderRepository entity.OrderRepository) *ListOrdersUseCase {
 	return &ListOrdersUseCase{OrderRepository: orderRepository}
 }
 
@@ -50,5 +45,15 @@ func (u *ListOrdersUseCase) Execute(ctx context.Context, input ListOrdersInput) 
 		input.Query = "%"
 	}
 
-	return u.OrderRepository.List(ctx, input)
+	orders, total, err := u.OrderRepository.List(ctx, input.Page, input.Limit, input.Query)
+	if err != nil {
+		return ListOrdersOutput{}, err
+	}
+
+	return ListOrdersOutput{
+		Orders: orders,
+		Total:  total,
+		Page:   input.Page,
+		Limit:  input.Limit,
+	}, nil
 }
